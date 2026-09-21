@@ -1,17 +1,13 @@
-//
-//  MarkerApp.swift
-//  Marker
-//
-//  Created by Sandew on 2026-03-09.
-//
+
+//MarkerApp.swift
 
 import SwiftUI
 
 @main
-struct MarkerApp: App {
+struct TodayApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SplashView()
         }
     }
 }
