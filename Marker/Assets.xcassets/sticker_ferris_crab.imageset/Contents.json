@@ -1,0 +1,23 @@
+{
+  "images": [
+    {
+      "filename": "sticker_ferris_crab.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "sticker_ferris_crab@2x.png",
+      "idiom": "universal",
+      "scale": "2x"
+    },
+    {
+      "filename": "sticker_ferris_crab@3x.png",
+      "idiom": "universal",
+      "scale": "3x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

@@ -45,6 +45,42 @@ extension Task {
     }
 }
 
+// MARK: - Sticker Models
+struct PlacedSticker: Identifiable, Codable, Equatable {
+    var id: UUID = UUID()
+    var stickerName: String
+    var x: CGFloat
+    var y: CGFloat
+    var scale: CGFloat = 1.0
+    var rotation: Double = 0.0 // In degrees
+    var zIndex: Double = 1.0
+}
+
+struct StickerItem: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let title: String
+}
+
+let availableStickers: [StickerItem] = [
+    StickerItem(id: "sticker_swift_bird", name: "sticker_swift_bird", title: "Swift"),
+    StickerItem(id: "sticker_xcode", name: "sticker_xcode", title: "Xcode"),
+    StickerItem(id: "sticker_tim_phil", name: "sticker_tim_phil", title: "Tim & Craig"),
+    StickerItem(id: "sticker_freeze_emoji", name: "sticker_freeze_emoji", title: "Freezing"),
+    StickerItem(id: "sticker_swift_logo", name: "sticker_swift_logo", title: "Swift Logo"),
+    StickerItem(id: "sticker_ferris_crab", name: "sticker_ferris_crab", title: "Ferris"),
+    StickerItem(id: "sticker_hello_rainbow", name: "sticker_hello_rainbow", title: "Rainbow Hello"),
+    StickerItem(id: "sticker_hello_black", name: "sticker_hello_black", title: "Black Hello"),
+    StickerItem(id: "sticker_appstore", name: "sticker_appstore", title: "App Store"),
+    StickerItem(id: "sticker_apple_ribbon", name: "sticker_apple_ribbon", title: "Apple Ribbon"),
+    StickerItem(id: "sticker_mac_classic", name: "sticker_mac_classic", title: "Classic Mac"),
+    StickerItem(id: "sticker_vision_pro", name: "sticker_vision_pro", title: "Vision Pro"),
+    StickerItem(id: "sticker_neon_bolt", name: "sticker_neon_bolt", title: "Lightning"),
+    StickerItem(id: "sticker_wwdc21", name: "sticker_wwdc21", title: "WWDC 21"),
+    StickerItem(id: "sticker_hello_world", name: "sticker_hello_world", title: "Hello World"),
+    StickerItem(id: "sticker_blue_star", name: "sticker_blue_star", title: "Sparkle Star")
+]
+
 // MARK: - App Features: Haptic Feedback
 func triggerHaptic(style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
     let generator = UIImpactFeedbackGenerator(style: style)
@@ -113,7 +149,19 @@ struct ContentView: View {
     @State private var activeMenuTask: Task? = nil
     @State private var activeMenuFrame: CGRect = .zero
     
+    // Sticker Studio State
+    @State private var placedStickers: [PlacedSticker] = []
+    @State private var showingStickerDrawer = false
+    @State private var selectedStickerId: UUID? = nil
+    @State private var topZIndex: Double = 1.0
+    
+    // Tray Drag & Paste Tracking
+    @State private var draggingStickerFromTray: StickerItem? = nil
+    @State private var trayDragLocation: CGPoint = .zero
+    @State private var isDraggingFromTray: Bool = false
+    
     let saveKey = "SavedTasks"
+    let stickersSaveKey = "SavedPlacedStickers"
     
     init() {
         UINavigationBar.appearance().largeTitleTextAttributes = [.foregroundColor: UIColor.systemGray]
@@ -150,9 +198,12 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 Color.amoledBackground
                     .ignoresSafeArea()
+                    .onTapGesture {
+                        selectedStickerId = nil
+                    }
                 
                 VStack(spacing: 0) {
                     
@@ -211,13 +262,37 @@ struct ContentView: View {
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     
-                    HStack(alignment: .center, spacing: 16) {
+                    HStack(alignment: .center, spacing: 14) {
                         Spacer()
                         
                         Text(todayString.uppercased())
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.gray)
                         
+                        // Sticker Drawer Button
+                        Button {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                                showingStickerDrawer.toggle()
+                                if showingStickerDrawer {
+                                    selectedStickerId = nil
+                                }
+                            }
+                            triggerHaptic(style: .medium)
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(showingStickerDrawer ? Color.primary : Color(UIColor.secondarySystemFill))
+                                    .frame(width: 44, height: 44)
+                                
+                                Image(systemName: showingStickerDrawer ? "sparkles" : "face.smiling.fill")
+                                    .font(.system(size: 21, weight: .semibold))
+                                    .foregroundColor(showingStickerDrawer ? Color(UIColor.systemBackground) : .primary)
+                            }
+                            .shadow(color: .primary.opacity(0.12), radius: 5, y: 3)
+                        }
+                        .accessibilityLabel("Sticker Studio")
+                        
+                        // Add Task Button
                         Button {
                             newTaskIsImportant = false
                             showingAddTask = true
@@ -229,6 +304,30 @@ struct ContentView: View {
                                 .shadow(color: .primary.opacity(0.1), radius: 5, y: 5)
                         }
                         .contextMenu {
+                            Button {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                                    showingStickerDrawer.toggle()
+                                }
+                                triggerHaptic(style: .medium)
+                            } label: {
+                                Label(showingStickerDrawer ? "Close Stickers" : "Sticker Studio", systemImage: "face.smiling")
+                            }
+                            
+                            if !placedStickers.isEmpty {
+                                Button(role: .destructive) {
+                                    withAnimation(.spring()) {
+                                        placedStickers.removeAll()
+                                        selectedStickerId = nil
+                                    }
+                                    triggerHaptic(style: .rigid)
+                                    saveStickers()
+                                } label: {
+                                    Label("Clear Screen Stickers (\(placedStickers.count))", systemImage: "sparkles.slash")
+                                }
+                            }
+                            
+                            Divider()
+                            
                             Button {
                                 newTaskIsImportant = true
                                 showingAddTask = true
@@ -362,10 +461,90 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     .zIndex(100)
                 }
+                
+                // MARK: - PLACED STICKERS INTERACTIVE CANVAS
+                ForEach($placedStickers) { $sticker in
+                    PlacedStickerView(
+                        sticker: $sticker,
+                        isSelected: selectedStickerId == sticker.id,
+                        onSelect: {
+                            selectedStickerId = sticker.id
+                            topZIndex += 1.0
+                            sticker.zIndex = topZIndex
+                            saveStickers()
+                        },
+                        onDelete: {
+                            if let idx = placedStickers.firstIndex(where: { $0.id == sticker.id }) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    placedStickers.remove(at: idx)
+                                }
+                                selectedStickerId = nil
+                                saveStickers()
+                            }
+                        },
+                        onCommit: {
+                            saveStickers()
+                        }
+                    )
+                }
+                
+                // MARK: - LIVE DRAG PREVIEW FROM TRAY
+                if isDraggingFromTray, let item = draggingStickerFromTray {
+                    Image(item.name)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 90, height: 90)
+                        .scaleEffect(1.15)
+                        .shadow(color: Color.black.opacity(0.35), radius: 14, x: 0, y: 8)
+                        .position(trayDragLocation)
+                        .zIndex(999)
+                        .allowsHitTesting(false)
+                }
+                
+                // MARK: - STICKER STUDIO BOTTOM DRAWER
+                if showingStickerDrawer {
+                    VStack {
+                        Spacer()
+                        StickerDrawerView(
+                            isPresented: $showingStickerDrawer,
+                            placedStickersCount: placedStickers.count,
+                            onSelectSticker: { item in
+                                addSticker(item)
+                            },
+                            onDragStart: { item, loc in
+                                isDraggingFromTray = true
+                                draggingStickerFromTray = item
+                                trayDragLocation = loc
+                            },
+                            onDragChange: { loc in
+                                trayDragLocation = loc
+                            },
+                            onDragEnd: { loc in
+                                if let item = draggingStickerFromTray, loc.y < UIScreen.main.bounds.height - 160 {
+                                    addSticker(item, at: loc)
+                                }
+                                isDraggingFromTray = false
+                                draggingStickerFromTray = nil
+                            },
+                            onClearAllStickers: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    placedStickers.removeAll()
+                                    selectedStickerId = nil
+                                }
+                                triggerHaptic(style: .rigid)
+                                saveStickers()
+                            }
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .zIndex(200)
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
             .onAppear {
                 loadTasks()
+                loadStickers()
                 UNUserNotificationCenter.current().requestAuthorization(options: .badge) { _, _ in }
             }
             .sheet(isPresented: $showingAddTask, onDismiss: {
@@ -490,6 +669,43 @@ struct ContentView: View {
     private func updateAppBadge() {
         let incompleteCount = tasks.filter { !$0.isCompleted }.count
         UIApplication.shared.applicationIconBadgeNumber = incompleteCount
+    }
+    
+    // MARK: - Sticker Studio Actions
+    private func addSticker(_ item: StickerItem, at location: CGPoint? = nil) {
+        let screenBounds = UIScreen.main.bounds
+        let targetX = location?.x ?? (screenBounds.midX + CGFloat.random(in: -35...35))
+        let targetY = location?.y ?? (screenBounds.midY - 40 + CGFloat.random(in: -35...35))
+        
+        topZIndex += 1.0
+        let newSticker = PlacedSticker(
+            stickerName: item.name,
+            x: targetX,
+            y: targetY,
+            scale: 1.0,
+            rotation: Double.random(in: -6...6),
+            zIndex: topZIndex
+        )
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
+            placedStickers.append(newSticker)
+            selectedStickerId = newSticker.id
+        }
+        triggerHaptic(style: .medium)
+        saveStickers()
+    }
+    
+    private func saveStickers() {
+        if let encodedData = try? JSONEncoder().encode(placedStickers) {
+            UserDefaults.standard.set(encodedData, forKey: stickersSaveKey)
+        }
+    }
+    
+    private func loadStickers() {
+        if let savedData = UserDefaults.standard.data(forKey: stickersSaveKey),
+           let decodedStickers = try? JSONDecoder().decode([PlacedSticker].self, from: savedData) {
+            placedStickers = decodedStickers
+            topZIndex = (decodedStickers.map { $0.zIndex }.max() ?? 1.0) + 1.0
+        }
     }
 }
 
@@ -894,6 +1110,312 @@ struct EditTaskView: View {
             self.date = taskToEdit.date
             self.selectedColor = taskToEdit.color ?? (taskToEdit.isImportant ? .red : .standard)
         }
+    }
+}
+
+// MARK: - Interactive Placed Sticker Component
+struct PlacedStickerView: View {
+    @Binding var sticker: PlacedSticker
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onDelete: () -> Void
+    let onCommit: () -> Void
+    
+    @State private var dragTranslation: CGSize = .zero
+    @State private var pinchScale: CGFloat = 1.0
+    @State private var rotationDelta: Angle = .zero
+    
+    private let baseSize: CGFloat = 100
+    
+    var body: some View {
+        let currentTotalScale = max(0.35, min(4.0, sticker.scale * pinchScale))
+        let currentTotalRotation = Angle.degrees(sticker.rotation) + rotationDelta
+        
+        ZStack(alignment: .topTrailing) {
+            Image(sticker.stickerName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: baseSize, height: baseSize)
+                .scaleEffect(currentTotalScale)
+                .rotationEffect(currentTotalRotation)
+                .shadow(
+                    color: Color.black.opacity(isSelected ? 0.35 : 0.18),
+                    radius: isSelected ? 10 : 5,
+                    x: 0,
+                    y: isSelected ? 6 : 3
+                )
+                .overlay(
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.primary.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5]))
+                                .frame(width: baseSize * currentTotalScale + 14, height: baseSize * currentTotalScale + 14)
+                                .rotationEffect(currentTotalRotation)
+                        }
+                    }
+                )
+            
+            // Delete button when selected
+            if isSelected {
+                Button {
+                    triggerHaptic(style: .rigid)
+                    onDelete()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(Color.white, Color.red)
+                        .background(Circle().fill(Color.white).padding(2))
+                        .shadow(radius: 3)
+                }
+                .offset(x: 10, y: -10)
+                .rotationEffect(currentTotalRotation)
+            }
+        }
+        .frame(width: baseSize, height: baseSize)
+        .contentShape(Rectangle())
+        .offset(
+            x: sticker.x - (baseSize / 2) + dragTranslation.width,
+            y: sticker.y - (baseSize / 2) + dragTranslation.height
+        )
+        .zIndex(sticker.zIndex)
+        .onTapGesture {
+            onSelect()
+            triggerHaptic(style: .light)
+        }
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    if !isSelected {
+                        onSelect()
+                    }
+                    dragTranslation = value.translation
+                }
+                .onEnded { value in
+                    sticker.x += value.translation.width
+                    sticker.y += value.translation.height
+                    dragTranslation = .zero
+                    triggerHaptic(style: .light)
+                    onCommit()
+                }
+        )
+        .simultaneousGesture(
+            MagnificationGesture()
+                .onChanged { scale in
+                    if !isSelected {
+                        onSelect()
+                    }
+                    pinchScale = scale
+                }
+                .onEnded { scale in
+                    sticker.scale = max(0.35, min(4.0, sticker.scale * scale))
+                    pinchScale = 1.0
+                    triggerHaptic(style: .light)
+                    onCommit()
+                }
+        )
+        .simultaneousGesture(
+            RotationGesture()
+                .onChanged { angle in
+                    if !isSelected {
+                        onSelect()
+                    }
+                    rotationDelta = angle
+                }
+                .onEnded { angle in
+                    sticker.rotation += angle.degrees
+                    rotationDelta = .zero
+                    triggerHaptic(style: .light)
+                    onCommit()
+                }
+        )
+    }
+}
+
+// MARK: - Sticker Drawer / Picker View
+struct StickerDrawerView: View {
+    @Binding var isPresented: Bool
+    let placedStickersCount: Int
+    let onSelectSticker: (StickerItem) -> Void
+    let onDragStart: (StickerItem, CGPoint) -> Void
+    let onDragChange: (CGPoint) -> Void
+    let onDragEnd: (CGPoint) -> Void
+    let onClearAllStickers: () -> Void
+    
+    private let rows = [
+        GridItem(.fixed(78), spacing: 10),
+        GridItem(.fixed(78), spacing: 10)
+    ]
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Drag handle
+            Capsule()
+                .fill(Color.gray.opacity(0.35))
+                .frame(width: 36, height: 5)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
+            
+            // Header Bar
+            HStack(alignment: .center) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.primary)
+                    
+                    Text("STICKER STUDIO")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.gray)
+                    
+                    if placedStickersCount > 0 {
+                        Text("\(placedStickersCount)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.primary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.primary.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                }
+                
+                Spacer()
+                
+                if placedStickersCount > 0 {
+                    Button {
+                        onClearAllStickers()
+                    } label: {
+                        Text("Clear Screen")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.red.opacity(0.85))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.red.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                    .padding(.trailing, 6)
+                }
+                
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        isPresented = false
+                    }
+                    triggerHaptic(style: .light)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.gray.opacity(0.6))
+                }
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 12)
+            
+            // Stickers Carousel
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHGrid(rows: rows, spacing: 12) {
+                    ForEach(availableStickers) { item in
+                        StickerDrawerCell(
+                            item: item,
+                            onSelect: {
+                                onSelectSticker(item)
+                            },
+                            onDragStart: { loc in
+                                onDragStart(item, loc)
+                            },
+                            onDragChange: onDragChange,
+                            onDragEnd: onDragEnd
+                        )
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+            }
+            .frame(height: 172)
+            
+            // Helper guide text
+            HStack(spacing: 6) {
+                Text("Tap or drag to paste • Pinch to resize • Rotate to tilt")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.gray.opacity(0.6))
+            }
+            .padding(.top, 4)
+            .padding(.bottom, 24)
+        }
+        .background(
+            Color.amoledBackground.opacity(0.88)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.25), radius: 25, x: 0, y: -5)
+        )
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    if value.translation.height > 60 {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                            isPresented = false
+                        }
+                        triggerHaptic(style: .light)
+                    }
+                }
+        )
+    }
+}
+
+// MARK: - Sticker Drawer Individual Cell
+struct StickerDrawerCell: View {
+    let item: StickerItem
+    let onSelect: () -> Void
+    let onDragStart: (CGPoint) -> Void
+    let onDragChange: (CGPoint) -> Void
+    let onDragEnd: (CGPoint) -> Void
+    
+    @State private var isPressing = false
+    @State private var hasInitiatedDrag = false
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(item.name)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 48, height: 48)
+                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+            
+            Text(item.title)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.gray)
+                .lineLimit(1)
+        }
+        .frame(width: 72, height: 74)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(UIColor.secondarySystemFill).opacity(0.35))
+        )
+        .scaleEffect(isPressing ? 0.92 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.65), value: isPressing)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onSelect()
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 10, coordinateSpace: .global)
+                .onChanged { value in
+                    if !hasInitiatedDrag {
+                        hasInitiatedDrag = true
+                        onDragStart(value.location)
+                    } else {
+                        onDragChange(value.location)
+                    }
+                }
+                .onEnded { value in
+                    if hasInitiatedDrag {
+                        onDragEnd(value.location)
+                        hasInitiatedDrag = false
+                    }
+                }
+        )
     }
 }
 

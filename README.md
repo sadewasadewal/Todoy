@@ -13,6 +13,7 @@ A sleek, AMOLED-friendly, gesture-driven daily task manager for iOS built native
 - 📋 **Batch Paste from Clipboard**: Copy multi-line lists from Notes or messages and paste them directly into Todoy with one tap.
 - 📳 **Tactile Haptic Feedback**: Every action—tapping, completing, starring, and deleting—is paired with tuned iOS haptics (`UIImpactFeedbackGenerator`).
 - 🎨 **Color Coding & Importance**: Highlight high-priority items with custom color accents (Standard, Red, Blue, Green, Orange) and swipe-to-star actions.
+- 🦄 **Sticker Studio & Floating Canvas**: Express yourself by placing, dragging, and pinning die-cut Apple & developer stickers anywhere on your screen.
 - 📊 **Insights & History**: Review your completed task archive and keep track of your daily productivity momentum.
 - 🔒 **100% Offline & Private**: Zero tracking, zero cloud accounts required. Your data stays securely on your device using local `UserDefaults` persistence.
 
@@ -25,8 +26,14 @@ A sleek, AMOLED-friendly, gesture-driven daily task manager for iOS built native
 | **Complete Task** | Single Tap | Marks task as completed with strikethrough animation |
 | **Quick Actions** | Long Press | Opens floating liquid-glass contextual action menu |
 | **Mark Important** | Swipe Right | Quickly toggle high-priority / starred status |
-| **Delete** | Swipe Left | Delete a task from the list |
-| **Batch Paste / Insights** | Long Press `+` | Opens clipboard paste and completion history |
+| **Delete Task** | Swipe Left | Delete a task from the list |
+| **Sticker Studio** | Bottom Sticker Button / Long Press `+` | Opens the liquid-glass Sticker Studio drawer |
+| **Place Sticker** | Tap or Drag from Drawer | Place stickers anywhere on the screen |
+| **Move Sticker** | Drag on Screen | Freely reposition any placed sticker |
+| **Resize Sticker** | Pinch In / Out | Scale sticker smoothly between 0.35x and 4.0x |
+| **Rotate Sticker** | Two-Finger Twist | Angle and tilt sticker naturally |
+| **Delete Sticker** | Tap to Select -> (X) Button | Delete sticker or clear all from drawer |
+| **Batch Paste / Insights** | Long Press `+` | Opens clipboard paste, sticker studio, and completion history |
 
 ---
 
