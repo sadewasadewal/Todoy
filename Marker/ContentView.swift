@@ -34,6 +34,8 @@ struct Task: Identifiable, Equatable, Codable {
     var isImportant: Bool
     var color: TaskColor?
     var completedDate: Date?
+    var reminderTime: Date? = nil
+    var notificationID: String? = nil
 }
 
 extension Task {
@@ -62,6 +64,8 @@ struct StickerItem: Identifiable, Hashable {
     let title: String
 }
 
+let recentStickersKey = "RecentStickerIDs"
+
 let availableStickers: [StickerItem] = [
     StickerItem(id: "sticker_swift_bird", name: "sticker_swift_bird", title: "Swift"),
     StickerItem(id: "sticker_xcode", name: "sticker_xcode", title: "Xcode"),
@@ -78,7 +82,13 @@ let availableStickers: [StickerItem] = [
     StickerItem(id: "sticker_neon_bolt", name: "sticker_neon_bolt", title: "Lightning"),
     StickerItem(id: "sticker_wwdc21", name: "sticker_wwdc21", title: "WWDC 21"),
     StickerItem(id: "sticker_hello_world", name: "sticker_hello_world", title: "Hello World"),
-    StickerItem(id: "sticker_blue_star", name: "sticker_blue_star", title: "Sparkle Star")
+    StickerItem(id: "sticker_blue_star", name: "sticker_blue_star", title: "Sparkle Star"),
+    StickerItem(id: "sticker_dot_black", name: "sticker_dot_black", title: "Dot"),
+    StickerItem(id: "sticker_circle_thin", name: "sticker_circle_thin", title: "Circle"),
+    StickerItem(id: "sticker_square_round", name: "sticker_square_round", title: "Rounded Square"),
+    StickerItem(id: "sticker_line_wave", name: "sticker_line_wave", title: "Wave"),
+    StickerItem(id: "sticker_star_min", name: "sticker_star_min", title: "Star"),
+    StickerItem(id: "sticker_heart_min", name: "sticker_heart_min", title: "Heart")
 ]
 
 // MARK: - App Features: Haptic Feedback
@@ -160,6 +170,8 @@ struct ContentView: View {
     @State private var trayDragLocation: CGPoint = .zero
     @State private var isDraggingFromTray: Bool = false
     
+    @State private var recentStickerIDs: [String] = []
+    
     let saveKey = "SavedTasks"
     let stickersSaveKey = "SavedPlacedStickers"
     
@@ -238,7 +250,7 @@ struct ContentView: View {
                                 onTap: { toggleTask(task) },
                                 onLongPress: { frame in
                                     activeMenuFrame = frame
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                         activeMenuTask = task
                                     }
                                 }
@@ -271,9 +283,13 @@ struct ContentView: View {
                         
                         // Sticker Drawer Button
                         Button {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                                showingStickerDrawer.toggle()
-                                if showingStickerDrawer {
+                            if showingStickerDrawer {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    showingStickerDrawer = false
+                                }
+                            } else {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    showingStickerDrawer = true
                                     selectedStickerId = nil
                                 }
                             }
@@ -288,7 +304,7 @@ struct ContentView: View {
                                     .font(.system(size: 21, weight: .semibold))
                                     .foregroundColor(showingStickerDrawer ? Color(UIColor.systemBackground) : .primary)
                             }
-                            .shadow(color: .primary.opacity(0.12), radius: 5, y: 3)
+                            .shadow(color: .primary.opacity(0.1), radius: 4, y: 2)
                         }
                         .accessibilityLabel("Sticker Studio")
                         
@@ -301,12 +317,18 @@ struct ContentView: View {
                             Image(systemName: "plus.circle.fill")
                                 .font(.system(size: 44))
                                 .foregroundColor(.primary)
-                                .shadow(color: .primary.opacity(0.1), radius: 5, y: 5)
+                                .shadow(color: .primary.opacity(0.1), radius: 4, y: 2)
                         }
                         .contextMenu {
                             Button {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                                    showingStickerDrawer.toggle()
+                                if showingStickerDrawer {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                                        showingStickerDrawer.toggle()
+                                    }
+                                } else {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                                        showingStickerDrawer.toggle()
+                                    }
                                 }
                                 triggerHaptic(style: .medium)
                             } label: {
@@ -396,44 +418,57 @@ struct ContentView: View {
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
                             
-                            Divider().opacity(0.5)
+                            Divider()
+                                .background(Color.white.opacity(0.08))
+                                .opacity(1.0)
                             
                             VStack(spacing: 0) {
                                 MenuRow(title: "Edit Task", icon: "pencil") {
                                     closeMenu()
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { taskToEdit = task }
                                 }
-                                Divider().opacity(0.5)
+                                Divider()
+                                    .background(Color.white.opacity(0.08))
+                                    .opacity(1.0)
                                 
                                 if let validURL = task.extractedURL {
                                     MenuRow(title: "Open Link", icon: "safari") {
                                         UIApplication.shared.open(validURL)
                                         closeMenu()
                                     }
-                                    Divider().opacity(0.5)
+                                    Divider()
+                                        .background(Color.white.opacity(0.08))
+                                        .opacity(1.0)
                                 }
                                 
                                 MenuRow(title: (task.color == .red || task.isImportant) ? "Unmark Important" : "Mark Important", icon: (task.color == .red || task.isImportant) ? "star.slash" : "star") {
                                     toggleImportant(task)
                                     closeMenu()
                                 }
-                                Divider().opacity(0.5)
+                                Divider()
+                                    .background(Color.white.opacity(0.08))
+                                    .opacity(1.0)
                                 
                                 MenuRow(title: "Duplicate Task", icon: "plus.square.on.square") {
                                     duplicateTask(task)
                                     closeMenu()
                                 }
-                                Divider().opacity(0.5)
+                                Divider()
+                                    .background(Color.white.opacity(0.08))
+                                    .opacity(1.0)
                                 
                                 MenuRow(title: "Copy Text", icon: "doc.on.doc") {
                                     UIPasteboard.general.string = task.title
                                     triggerHaptic(style: .light)
                                     closeMenu()
                                 }
-                                Divider().opacity(0.5)
+                                Divider()
+                                    .background(Color.white.opacity(0.08))
+                                    .opacity(1.0)
                                 
                                 MenuRow(title: "Delete Task", icon: "trash", isDestructive: true) {
                                     if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
+                                        cancelReminder(for: task)
                                         withAnimation { tasks.remove(at: idx) }
                                         triggerHaptic(style: .rigid)
                                         saveTasks()
@@ -443,19 +478,19 @@ struct ContentView: View {
                             }
                         }
                         .frame(width: 260)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(18)
+                        .background(.thinMaterial)
+                        .cornerRadius(22, antialiased: true)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 18)
-                                .stroke(Color.white.opacity(0.5), lineWidth: 1)
-                                .blendMode(.overlay)
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
                         )
-                        .shadow(color: Color.black.opacity(0.15), radius: 30, x: 0, y: 15)
+                        .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
                         .offset(
                             x: activeMenuFrame.minX,
                             y: opensUpwards ? (activeMenuFrame.minY - 300) : (activeMenuFrame.maxY + 12)
                         )
                         .transition(.scale(scale: 0.8, anchor: opensUpwards ? .bottomLeading : .topLeading).combined(with: .opacity))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: activeMenuTask)
                         .zIndex(1)
                     }
                     .ignoresSafeArea()
@@ -495,7 +530,7 @@ struct ContentView: View {
                         .scaledToFit()
                         .frame(width: 90, height: 90)
                         .scaleEffect(1.15)
-                        .shadow(color: Color.black.opacity(0.35), radius: 14, x: 0, y: 8)
+                        .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 6)
                         .position(trayDragLocation)
                         .zIndex(999)
                         .allowsHitTesting(false)
@@ -505,9 +540,15 @@ struct ContentView: View {
                 if showingStickerDrawer {
                     VStack {
                         Spacer()
+                        let sortedStickers = availableStickers.sorted { a, b in
+                            let ia = recentStickerIDs.firstIndex(of: a.id) ?? Int.max
+                            let ib = recentStickerIDs.firstIndex(of: b.id) ?? Int.max
+                            return ia < ib
+                        }
                         StickerDrawerView(
                             isPresented: $showingStickerDrawer,
                             placedStickersCount: placedStickers.count,
+                            stickers: sortedStickers,
                             onSelectSticker: { item in
                                 addSticker(item)
                             },
@@ -545,17 +586,18 @@ struct ContentView: View {
             .onAppear {
                 loadTasks()
                 loadStickers()
-                UNUserNotificationCenter.current().requestAuthorization(options: .badge) { _, _ in }
+                loadRecentStickers()
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
             }
             .sheet(isPresented: $showingAddTask, onDismiss: {
                 saveTasks()
             }) {
-                AddTaskView(tasks: $tasks, initialImportant: newTaskIsImportant)
+                AddTaskView(tasks: $tasks, initialImportant: newTaskIsImportant, scheduleReminder: scheduleReminderIfNeeded)
             }
             .sheet(item: $taskToEdit, onDismiss: {
                 saveTasks()
             }) { task in
-                EditTaskView(tasks: $tasks, taskToEdit: task)
+                EditTaskView(tasks: $tasks, taskToEdit: task, rescheduleReminder: rescheduleReminder)
             }
             .sheet(isPresented: $showingCompletedTasks, onDismiss: {
                 saveTasks()
@@ -574,10 +616,15 @@ struct ContentView: View {
     
     private func toggleTask(_ task: Task) {
         guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        let isNowComplete = !tasks[index].isCompleted
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0)) {
-            let isNowComplete = !tasks[index].isCompleted
             tasks[index].isCompleted = isNowComplete
             tasks[index].completedDate = isNowComplete ? Date() : nil
+        }
+        if isNowComplete {
+            cancelReminder(for: tasks[index])
+        } else if tasks[index].reminderTime != nil {
+            rescheduleReminder(for: tasks[index])
         }
         triggerHaptic(style: .light)
         saveTasks()
@@ -603,6 +650,7 @@ struct ContentView: View {
             for index in offsets {
                 let taskToDelete = currentTasks[index]
                 if let originalIndex = tasks.firstIndex(where: { $0.id == taskToDelete.id }) {
+                    cancelReminder(for: tasks[originalIndex])
                     tasks.remove(at: originalIndex)
                 }
             }
@@ -612,9 +660,12 @@ struct ContentView: View {
     }
     
     private func duplicateTask(_ task: Task) {
-        let duplicatedTask = Task(title: task.title, isCompleted: false, date: task.date, isImportant: task.isImportant, color: task.color ?? .standard)
+        let duplicatedTask = Task(title: task.title, isCompleted: false, date: task.date, isImportant: task.isImportant, color: task.color ?? .standard, reminderTime: task.reminderTime)
         withAnimation(.spring()) {
             tasks.append(duplicatedTask)
+        }
+        if duplicatedTask.reminderTime != nil {
+            scheduleReminderIfNeeded(for: duplicatedTask)
         }
         triggerHaptic(style: .light)
         saveTasks()
@@ -671,8 +722,36 @@ struct ContentView: View {
         UIApplication.shared.applicationIconBadgeNumber = incompleteCount
     }
     
+    // MARK: - Reminder Scheduling Helpers
+    private func scheduleReminderIfNeeded(for task: Task) {
+        guard let reminder = task.reminderTime else { return }
+        var comps = Calendar.current.dateComponents([.year, .month, .day], from: task.date)
+        let t = Calendar.current.dateComponents([.hour, .minute], from: reminder)
+        comps.hour = t.hour
+        comps.minute = t.minute
+        guard let fireDate = Calendar.current.date(from: comps), fireDate > Date() else { return }
+        let id = task.notificationID ?? UUID().uuidString
+        let content = UNMutableNotificationContent()
+        content.title = "Reminder"
+        content.body = task.title
+        content.sound = .default
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let req = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+        if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
+            tasks[idx].notificationID = id
+        }
+    }
+
+    private func rescheduleReminder(for task: Task) {
+        cancelReminder(for: task)
+        scheduleReminderIfNeeded(for: task)
+    }
+    
     // MARK: - Sticker Studio Actions
     private func addSticker(_ item: StickerItem, at location: CGPoint? = nil) {
+        pushRecentSticker(item.id)
+        
         let screenBounds = UIScreen.main.bounds
         let targetX = location?.x ?? (screenBounds.midX + CGFloat.random(in: -35...35))
         let targetY = location?.y ?? (screenBounds.midY - 40 + CGFloat.random(in: -35...35))
@@ -706,6 +785,21 @@ struct ContentView: View {
             placedStickers = decodedStickers
             topZIndex = (decodedStickers.map { $0.zIndex }.max() ?? 1.0) + 1.0
         }
+    }
+    
+    private func loadRecentStickers() {
+        if let ids = UserDefaults.standard.array(forKey: recentStickersKey) as? [String] {
+            recentStickerIDs = ids
+        }
+    }
+    
+    private func pushRecentSticker(_ id: String) {
+        recentStickerIDs.removeAll { $0 == id }
+        recentStickerIDs.insert(id, at: 0)
+        if recentStickerIDs.count > 10 {
+            recentStickerIDs = Array(recentStickerIDs.prefix(10))
+        }
+        UserDefaults.standard.set(recentStickerIDs, forKey: recentStickersKey)
     }
 }
 
@@ -782,6 +876,21 @@ struct TaskRowView: View {
         }, onPressingChanged: { pressing in
             isPressed = pressing
         })
+    }
+}
+
+// MARK: - Reminder Helpers
+func combine(date dayDate: Date, with time: Date) -> Date? {
+    var comps = Calendar.current.dateComponents([.year, .month, .day], from: dayDate)
+    let t = Calendar.current.dateComponents([.hour, .minute], from: time)
+    comps.hour = t.hour
+    comps.minute = t.minute
+    return Calendar.current.date(from: comps)
+}
+
+func cancelReminder(for task: Task) {
+    if let id = task.notificationID {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
     }
 }
 
@@ -870,7 +979,8 @@ struct CompletedTasksView: View {
                                 .swipeActions(edge: .trailing) {
                                     Button(role: .destructive) {
                                         if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
-                                            withAnimation { tasks.remove(at: idx) }
+                                            cancelReminder(for: task)
+                                            _ = withAnimation { tasks.remove(at: idx) }
                                             triggerHaptic(style: .rigid)
                                         }
                                     } label: {
@@ -907,7 +1017,12 @@ struct CompletedTasksView: View {
                 ToolbarItem(placement: .destructiveAction) {
                     if !completedTasks.isEmpty {
                         Button("Clear All") {
-                            withAnimation { tasks.removeAll(where: { $0.isCompleted }) }
+                            withAnimation {
+                                for task in tasks where task.isCompleted {
+                                    cancelReminder(for: task)
+                                }
+                                tasks.removeAll(where: { $0.isCompleted })
+                            }
                             triggerHaptic(style: .rigid)
                         }
                         .foregroundColor(.red)
@@ -946,10 +1061,14 @@ struct AddTaskView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var tasks: [Task]
     var initialImportant: Bool
+    var scheduleReminder: (Task) -> Void
     
     @State private var title = ""
     @State private var date = Date()
     @State private var selectedColor: TaskColor = .standard
+    
+    @State private var hasReminder: Bool = false
+    @State private var reminderTime: Date = Date()
     
     var body: some View {
         ZStack {
@@ -966,8 +1085,12 @@ struct AddTaskView: View {
                     Spacer()
                     
                     Button("Add Task") {
-                        let newTask = Task(title: title, isCompleted: false, date: date, isImportant: selectedColor == .red, color: selectedColor)
-                        withAnimation { tasks.append(newTask) }
+                        let combinedDate = hasReminder ? combine(date: date, with: reminderTime) : nil
+                        var newTask = Task(title: title, isCompleted: false, date: date, isImportant: selectedColor == .red, color: selectedColor)
+                        newTask.reminderTime = combinedDate
+                        newTask.notificationID = nil
+                        _ = withAnimation { tasks.append(newTask) }
+                        scheduleReminder(newTask)
                         triggerHaptic(style: .medium)
                         dismiss()
                     }
@@ -990,6 +1113,19 @@ struct AddTaskView: View {
                     DatePicker("", selection: $date, displayedComponents: .date)
                         .labelsHidden()
                         .scaleEffect(1.05, anchor: .leading)
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle(isOn: $hasReminder) {
+                        Text("REMINDER")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.gray)
+                    }
+                    if hasReminder {
+                        DatePicker("", selection: $reminderTime, displayedComponents: [.hourAndMinute])
+                            .labelsHidden()
+                            .scaleEffect(1.05, anchor: .leading)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 16) {
@@ -1020,6 +1156,10 @@ struct AddTaskView: View {
         }
         .onAppear {
             self.selectedColor = initialImportant ? .red : .standard
+            if initialImportant {
+                self.hasReminder = false
+                self.reminderTime = Date()
+            }
         }
     }
 }
@@ -1029,10 +1169,14 @@ struct EditTaskView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var tasks: [Task]
     let taskToEdit: Task
+    var rescheduleReminder: (Task) -> Void
     
     @State private var title = ""
     @State private var date = Date()
     @State private var selectedColor: TaskColor = .standard
+    
+    @State private var hasReminder: Bool = false
+    @State private var reminderTime: Date = Date()
     
     var body: some View {
         ZStack {
@@ -1054,6 +1198,13 @@ struct EditTaskView: View {
                             tasks[index].date = date
                             tasks[index].color = selectedColor
                             tasks[index].isImportant = (selectedColor == .red)
+                            let combinedDate = hasReminder ? combine(date: date, with: reminderTime) : nil
+                            tasks[index].reminderTime = combinedDate
+                            if combinedDate != nil {
+                                rescheduleReminder(tasks[index])
+                            } else {
+                                cancelReminder(for: tasks[index])
+                            }
                         }
                         triggerHaptic(style: .medium)
                         dismiss()
@@ -1077,6 +1228,19 @@ struct EditTaskView: View {
                     DatePicker("", selection: $date, displayedComponents: .date)
                         .labelsHidden()
                         .scaleEffect(1.05, anchor: .leading)
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle(isOn: $hasReminder) {
+                        Text("REMINDER")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.gray)
+                    }
+                    if hasReminder {
+                        DatePicker("", selection: $reminderTime, displayedComponents: [.hourAndMinute])
+                            .labelsHidden()
+                            .scaleEffect(1.05, anchor: .leading)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 16) {
@@ -1109,6 +1273,8 @@ struct EditTaskView: View {
             self.title = taskToEdit.title
             self.date = taskToEdit.date
             self.selectedColor = taskToEdit.color ?? (taskToEdit.isImportant ? .red : .standard)
+            self.hasReminder = taskToEdit.reminderTime != nil
+            self.reminderTime = taskToEdit.reminderTime ?? Date()
         }
     }
 }
@@ -1138,39 +1304,7 @@ struct PlacedStickerView: View {
                 .frame(width: baseSize, height: baseSize)
                 .scaleEffect(currentTotalScale)
                 .rotationEffect(currentTotalRotation)
-                .shadow(
-                    color: Color.black.opacity(isSelected ? 0.35 : 0.18),
-                    radius: isSelected ? 10 : 5,
-                    x: 0,
-                    y: isSelected ? 6 : 3
-                )
-                .overlay(
-                    Group {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.primary.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5]))
-                                .frame(width: baseSize * currentTotalScale + 14, height: baseSize * currentTotalScale + 14)
-                                .rotationEffect(currentTotalRotation)
-                        }
-                    }
-                )
-            
-            // Delete button when selected
-            if isSelected {
-                Button {
-                    triggerHaptic(style: .rigid)
-                    onDelete()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 22))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(Color.white, Color.red)
-                        .background(Circle().fill(Color.white).padding(2))
-                        .shadow(radius: 3)
-                }
-                .offset(x: 10, y: -10)
-                .rotationEffect(currentTotalRotation)
-            }
+                .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
         }
         .frame(width: baseSize, height: baseSize)
         .contentShape(Rectangle())
@@ -1182,6 +1316,10 @@ struct PlacedStickerView: View {
         .onTapGesture {
             onSelect()
             triggerHaptic(style: .light)
+        }
+        .onLongPressGesture(minimumDuration: 0.6) {
+            triggerHaptic(style: .rigid)
+            onDelete()
         }
         .gesture(
             DragGesture()
@@ -1236,6 +1374,7 @@ struct PlacedStickerView: View {
 struct StickerDrawerView: View {
     @Binding var isPresented: Bool
     let placedStickersCount: Int
+    let stickers: [StickerItem]
     let onSelectSticker: (StickerItem) -> Void
     let onDragStart: (StickerItem, CGPoint) -> Void
     let onDragChange: (CGPoint) -> Void
@@ -1273,7 +1412,7 @@ struct StickerDrawerView: View {
                             .foregroundColor(.primary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.primary.opacity(0.1))
+                            .background(Color.primary.opacity(0.06))
                             .clipShape(Capsule())
                     }
                 }
@@ -1286,10 +1425,10 @@ struct StickerDrawerView: View {
                     } label: {
                         Text("Clear Screen")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.red.opacity(0.85))
+                            .foregroundColor(.red.opacity(0.8))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.red.opacity(0.1))
+                            .background(Color.red.opacity(0.08))
                             .clipShape(Capsule())
                     }
                     .padding(.trailing, 6)
@@ -1312,7 +1451,7 @@ struct StickerDrawerView: View {
             // Stickers Carousel
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHGrid(rows: rows, spacing: 12) {
-                    ForEach(availableStickers) { item in
+                    ForEach(stickers) { item in
                         StickerDrawerCell(
                             item: item,
                             onSelect: {
@@ -1335,21 +1474,16 @@ struct StickerDrawerView: View {
             HStack(spacing: 6) {
                 Text("Tap or drag to paste • Pinch to resize • Rotate to tilt")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.gray.opacity(0.6))
+                    .foregroundColor(.gray.opacity(0.5))
             }
             .padding(.top, 4)
             .padding(.bottom, 24)
         }
         .background(
-            Color.amoledBackground.opacity(0.88)
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.25), radius: 25, x: 0, y: -5)
+            .ultraThinMaterial
         )
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: -2)
         .gesture(
             DragGesture()
                 .onEnded { value in
@@ -1361,6 +1495,7 @@ struct StickerDrawerView: View {
                     }
                 }
         )
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isPresented)
     }
 }
 
@@ -1380,24 +1515,25 @@ struct StickerDrawerCell: View {
             Image(item.name)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 48, height: 48)
-                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                .frame(width: 54, height: 54)
             
             Text(item.title)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(.gray)
                 .lineLimit(1)
         }
-        .frame(width: 72, height: 74)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color(UIColor.secondarySystemFill).opacity(0.35))
-        )
+        .frame(width: 64, height: 70)
         .scaleEffect(isPressing ? 0.92 : 1.0)
         .animation(.spring(response: 0.25, dampingFraction: 0.65), value: isPressing)
         .contentShape(Rectangle())
         .onTapGesture {
             onSelect()
+        }
+        .onLongPressGesture(minimumDuration: 0.15) {
+            isPressing = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                isPressing = false
+            }
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 10, coordinateSpace: .global)
